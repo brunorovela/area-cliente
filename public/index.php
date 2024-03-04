@@ -32,6 +32,10 @@ if (! class_exists(Application::class)) {
 }
 
 $container = require __DIR__ . '/../config/container.php';
+
+// Inicialização do Eloquent
+require __DIR__ . '/../config/eloquent.php';
+
 // Run the application!
 /** @var Application $app */
 $app = $container->get('Application');

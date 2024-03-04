@@ -4,40 +4,23 @@ declare(strict_types=1);
 
 namespace AreaCliente;
 
-use Laminas\Router\Http\Literal;
-use Laminas\Router\Http\Segment;
 use Laminas\ServiceManager\Factory\InvokableFactory;
 
 return [
     'router' => [
         'routes' => [
-            'home' => [
-                'type'    => Literal::class,
-                'options' => [
-                    'route'    => '/',
-                    'defaults' => [
-                        'controller' => Controller\IndexController::class,
-                        'action'     => 'index',
-                    ],
-                ],
-            ],
-            'application' => [
-                'type'    => Segment::class,
-                'options' => [
-                    'route'    => '/application[/:action]',
-                    'defaults' => [
-                        'controller' => Controller\IndexController::class,
-                        'action'     => 'index',
-                    ],
-                ],
-            ],
+            'rota-login' => include __DIR__ . '/rotas/login.config.php',
+            'rota-home' => include __DIR__ . '/rotas/home.config.php',
         ],
     ],
+
     'controllers' => [
         'factories' => [
             Controller\IndexController::class => InvokableFactory::class,
+            Controller\LoginController::class => InvokableFactory::class,
         ],
     ],
+
     'view_manager' => [
         'display_not_found_reason' => true,
         'display_exceptions'       => true,

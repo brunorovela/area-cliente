@@ -11,20 +11,23 @@
  * control, so do not include passwords or other sensitive information in this
  * file.
  */
-
 return [
-    'auth' => [
+    'db' => [
+        'driver'   => 'mysql',
+        'database' => 'uninformare',
+        'username' => 'cliente',
+        'password' => 'p23id9i1ndhhg12sp2l/hfgdamviwgvtvasjdp==',
+        'hostname' => 'mysql.unimestre.com',
+        'charset'  => 'utf8'
+    ],
+];
+
+/*
+   'auth' => [
         'host' => 'sso.unimestre.com',
         'port' => 443,
         'context' => '/auth',
         'php_loader' => './public/CAS/CAS.php'
-    ],
-
-    'db' => [
-        'driver' => 'Pdo',
-        'username' => 'cliente',
-        'password' => 'p23id9i1ndhhg12sp2l/hfgdamviwgvtvasjdp==',
-        'dsn' => 'mysql:dbname=uninformare;host=mysql.unimestre.com'
     ],
 
     'ConexaoUTF8' => [
@@ -76,5 +79,4 @@ return [
         'port'     => '3306',
         'charset'  => 'utf8'
     ]
-     */
-];
+*/
