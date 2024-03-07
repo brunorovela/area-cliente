@@ -2,41 +2,88 @@
 
 declare(strict_types=1);
 
-use Laminas\Mvc\Application;
+use App\Application\Handlers\HttpErrorHandler;
+use App\Application\Handlers\ShutdownHandler;
+use App\Application\ResponseEmitter\ResponseEmitter;
+use App\Application\Settings\SettingsInterface;
+use DI\ContainerBuilder;
+use Slim\Factory\AppFactory;
+use Slim\Factory\ServerRequestCreatorFactory;
+use Slim\Views\Twig;
+use Slim\Views\TwigMiddleware;
 
-/**
- * This makes our life easier when dealing with paths. Everything is relative
- * to the application root now.
- */
+require __DIR__ . '/../vendor/autoload.php';
 
-chdir(dirname(__DIR__));
+// Instantiate PHP-DI ContainerBuilder
+$containerBuilder = new ContainerBuilder();
 
-// Decline static file requests back to the PHP built-in webserver
-if (php_sapi_name() === 'cli-server') {
-    $path = realpath(__DIR__ . parse_url($_SERVER['REQUEST_URI'] ?? '', PHP_URL_PATH));
-    if (is_string($path) && __FILE__ !== $path && is_file($path)) {
-        return false;
-    }
-    unset($path);
+if (false) { // Should be set to true in production
+	$containerBuilder->enableCompilation(__DIR__ . '/../var/cache');
 }
 
-// Composer autoloading
-include __DIR__ . '/../vendor/autoload.php';
+// Set up settings
+$settings = require __DIR__ . '/../app/settings.php';
+$settings($containerBuilder);
 
-if (! class_exists(Application::class)) {
-    throw new RuntimeException(
-        "Unable to load application.\n"
-        . "- Type `composer install` if you are developing locally.\n"
-        . "- Type `docker-compose run laminas composer install` if you are using Docker.\n"
-    );
-}
+// Set up dependencies
+$dependencies = require __DIR__ . '/../app/dependencies.php';
+$dependencies($containerBuilder);
 
-$container = require __DIR__ . '/../config/container.php';
+// Set up repositories
+$repositories = require __DIR__ . '/../app/repositories.php';
+$repositories($containerBuilder);
 
-// Inicialização do Eloquent
-require __DIR__ . '/../config/eloquent.php';
+// Build PHP-DI Container instance
+$container = $containerBuilder->build();
 
-// Run the application!
-/** @var Application $app */
-$app = $container->get('Application');
-$app->run();
+// Instantiate the app
+AppFactory::setContainer($container);
+$app = AppFactory::create();
+$callableResolver = $app->getCallableResolver();
+
+// Register middleware
+$middleware = require __DIR__ . '/../app/middleware.php';
+$middleware($app);
+
+// Register routes
+$routes = require __DIR__ . '/../app/routes.php';
+$routes($app);
+
+/** @var SettingsInterface $settings */
+$settings = $container->get(SettingsInterface::class);
+
+$displayErrorDetails = $settings->get('displayErrorDetails');
+$logError = $settings->get('logError');
+$logErrorDetails = $settings->get('logErrorDetails');
+
+// Create Request object from globals
+$serverRequestCreator = ServerRequestCreatorFactory::create();
+$request = $serverRequestCreator->createServerRequestFromGlobals();
+
+// Create Error Handler
+$responseFactory = $app->getResponseFactory();
+$errorHandler = new HttpErrorHandler($callableResolver, $responseFactory);
+
+// Create Shutdown Handler
+$shutdownHandler = new ShutdownHandler($request, $errorHandler, $displayErrorDetails);
+register_shutdown_function($shutdownHandler);
+
+// Add Routing Middleware
+$app->addRoutingMiddleware();
+
+// Add Body Parsing Middleware
+$app->addBodyParsingMiddleware();
+
+// Add Error Middleware
+$errorMiddleware = $app->addErrorMiddleware($displayErrorDetails, $logError, $logErrorDetails);
+$errorMiddleware->setDefaultErrorHandler($errorHandler);
+
+//templates
+$twig = Twig::create('templates', ['cache' => false]);
+$app->add(TwigMiddleware::create($app, $twig));
+$container->set(Twig::class, $twig);
+
+// Run App & Emit Response
+$response = $app->handle($request);
+$responseEmitter = new ResponseEmitter();
+$responseEmitter->emit($response);
